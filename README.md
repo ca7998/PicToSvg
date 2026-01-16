@@ -1,4 +1,4 @@
-# PicToSvg 图片批量转矢量工具 (Batch Image to SVG)
+# PicToSvg 图片批量转矢量工具
 
 一个基于 Python 和 vtracer 的极简、现代化的图片转 SVG 矢量图工具。支持 Windows 和 macOS，专为批量处理设计。
 
