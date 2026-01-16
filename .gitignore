@@ -1,0 +1,20 @@
+# Python 编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyInstaller 打包生成的文件
+build/
+dist/
+*.spec
+
+# 用户配置文件 (不建议上传个人的配置)
+config.json
+
+# 操作系统生成的文件
+.DS_Store
+Thumbs.db
+
+# 虚拟环境
+venv/
+env/
