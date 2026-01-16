@@ -12,13 +12,9 @@
 *   **配置记忆**：自动记住上次使用的文件夹路径，无需重复选择。
 *   **隐私安全**：完全本地运行，无需上传图片到服务器。
 
-## 📥 下载安装
-
-请前往 [Releases 页面](这里填你的Github仓库Releases链接) 下载最新版本的 Windows 或 macOS 应用程序。
-
 ## 📖 使用说明
 
-1. **下载与解压**：从 [Releases 页面](这里填你的Github仓库Releases链接) 下载最新版本的应用程序压缩包，解压后得到 `PicToSvg.exe`（Windows）或 `PicToSvg.app`（macOS）。
+1. **下载与解压**：从 [Releases 页面](https://github.com/ca7998/PicToSvg/releases) 下载最新版本的应用程序压缩包，解压后得到 `PicToSvg.exe`（Windows）或 `PicToSvg.app`（macOS）。
 2. **运行程序**：双击 `PicToSvg.exe`（Windows）或 `PicToSvg.app`（macOS）启动程序。
 3. **选择输入文件夹**：点击“打开文件夹”按钮，选择包含图片的文件夹。
 4. **配置参数**：调整上方参数面板中的转换设置，或使用预设进行快速配置。
