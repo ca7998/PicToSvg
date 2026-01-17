@@ -9,17 +9,21 @@ from pathlib import Path
 
 # === 全局配置 ===
 CONFIG_FILE = "config.json"
-APP_TITLE = "PicToSvg 图片批量转矢量工具"
-APP_VERSION = "v1.1 | by Carry Cai | 微信：imcc1688 | 公众号：无趣研习社"
+APP_TITLE = "PicToSvg图片批量转矢量工具v1.6 final"
+APP_VERSION = "v1.6 final | by Carry Cai | 微信:imcc1688 | 公众号:无趣研习社"
 EXECUTABLE_NAME = "vtracer.exe" if os.name == 'nt' else "vtracer"
+ICON_NAME = "icon.ico" # 定义图标文件名
 
-# === 核心：获取 vtracer 路径 (支持打包模式) ===
-def get_exe_path():
+# === 核心：资源路径获取 (关键修改：支持打包后的资源读取) ===
+def resource_path(relative_path):
+    """ 获取资源绝对路径，兼容开发环境和打包后的环境 """
     if getattr(sys, 'frozen', False):
+        # PyInstaller 打包后的临时目录
         base_path = sys._MEIPASS
     else:
+        # 开发环境
         base_path = os.getcwd()
-    return os.path.join(base_path, EXECUTABLE_NAME)
+    return os.path.join(base_path, relative_path)
 
 # === 预设参数 ===
 PRESETS = {
@@ -27,6 +31,11 @@ PRESETS = {
         "colormode": "color", "hierarchical": "stacked", "mode": "spline",
         "filter_speckle": 4, "color_precision": 6, "gradient_step": 16,
         "corner_threshold": 60, "segment_length": 5.0, "splice_threshold": 45, "path_precision": 8
+    },
+    "毛笔字 (Calligraphy)": {
+        "colormode": "bw", "hierarchical": "stacked", "mode": "spline",
+        "filter_speckle": 2, "color_precision": 8, "gradient_step": 16,
+        "corner_threshold": 45, "segment_length": 3.5, "splice_threshold": 30, "path_precision": 6
     },
     "黑白 (BW)": {
         "colormode": "bw", "hierarchical": "stacked", "mode": "spline",
@@ -45,7 +54,7 @@ PRESETS = {
     }
 }
 
-# === 图形绘制辅助函数：通用圆角矩形 ===
+# === 图形绘制辅助函数 ===
 def create_rounded_rect(canvas, x1, y1, x2, y2, radius=25, **kwargs):
     points = [x1+radius, y1, x1+radius, y1, x2-radius, y1, x2-radius, y1, x2, y1, x2, y1+radius, x2, y1+radius, x2, y2-radius, x2, y2-radius, x2, y2, x2-radius, y2, x2-radius, y2, x1+radius, y2, x1+radius, y2, x1, y2, x1, y2-radius, x1, y2-radius, x1, y1+radius, x1, y1+radius, x1, y1]
     return canvas.create_polygon(points, **kwargs, smooth=True)
@@ -191,11 +200,19 @@ class PicToSvgApp:
     def __init__(self, root):
         self.root = root
         self.root.title(APP_TITLE)
-        # 紧凑高度：默认 850x600，适合大多数屏幕
         self.root.geometry("850x600") 
         self.root.minsize(800, 550)
         self.root.configure(bg="white")
         
+        # 尝试设置运行时图标 (Windows任务栏图标)
+        try:
+            icon_path = resource_path(ICON_NAME)
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except:
+            pass
+
+        # 变量初始化
         self.input_dir = tk.StringVar()
         self.output_dir = tk.StringVar()
         self.process_subdirs = tk.BooleanVar(value=False)
@@ -203,6 +220,7 @@ class PicToSvgApp:
         self.is_processing = False
         self.log_visible = False
         
+        # 参数初始化
         self.p_colormode = tk.StringVar(value="color")
         self.p_hierarchical = tk.StringVar(value="stacked")
         self.p_mode = tk.StringVar(value="spline")
@@ -219,7 +237,8 @@ class PicToSvgApp:
         self.load_config()
         self.create_widgets()
         self.check_param_states()
-        self.root.update_idletasks(); self.root.geometry("") 
+        self.root.update_idletasks()
+        self.root.geometry("") 
 
     def setup_styles(self):
         style = ttk.Style()
@@ -234,22 +253,24 @@ class PicToSvgApp:
         style.configure("Preset.TButton", font=("Microsoft YaHei", 10), padding=4)
         
     def create_widgets(self):
-        # 减少内边距，更紧凑
+        # 监听变量变化
+        self.p_colormode.trace_add("write", lambda *args: self.check_param_states())
+        self.p_mode.trace_add("write", lambda *args: self.check_param_states())
+
         main_pad = ttk.Frame(self.root, padding="25 10")
         main_pad.pack(fill="both", expand=True)
 
-        # 1. 文件夹 (行距减小)
+        # 1. 文件夹
         path_frame = ttk.Frame(main_pad)
         path_frame.pack(fill="x", pady=(0, 10))
         path_frame.columnconfigure(1, weight=1); path_frame.columnconfigure(4, weight=1)
 
         def create_entry(parent, label, var, cmd, col):
             ttk.Label(parent, text=label, style="Title.TLabel").grid(row=0, column=col, sticky="nw", padx=(0, 8), pady=6)
-            # 缩小输入框高度 36 -> 32
             bg = RoundedFrame(parent, width=200, height=32, fill_color="#f8f9fa")
             bg.grid(row=0, column=col+1, sticky="ew", padx=0)
             ent = ttk.Entry(parent, textvariable=var, font=("Microsoft YaHei", 11), width=10)
-            ent.place(in_=bg, x=8, y=4, relwidth=0.92, height=24) # y调整
+            ent.place(in_=bg, x=8, y=4, relwidth=0.92, height=24)
             ttk.Button(parent, text="选择", width=5, command=cmd).grid(row=0, column=col+2, padx=(8, 15))
 
         create_entry(path_frame, "输入:", self.input_dir, self.select_input, 0)
@@ -274,7 +295,6 @@ class PicToSvgApp:
         grid_frame.pack(fill="x")
         grid_frame.columnconfigure(1, weight=1); grid_frame.columnconfigure(4, weight=1); grid_frame.columnconfigure(2, minsize=30) 
 
-        # 减小参数行距 pady 8 -> 4
         def add_radio(r, c, label, var, opts, desc, tag):
             ttk.Label(grid_frame, text=label).grid(row=r*2, column=c, sticky="w", pady=(4,0))
             box = ttk.Frame(grid_frame); box.grid(row=r*2, column=c+1, sticky="w", padx=5, pady=(4,0))
@@ -290,21 +310,29 @@ class PicToSvgApp:
             sl.pack(side="left", fill="x", expand=True)
             val_lbl = ttk.Label(box, text="0", width=4, anchor="e", foreground="#28a745", font=("Consolas", 12, "bold"))
             val_lbl.pack(side="right", padx=(2,0))
-            var.trace_add("write", lambda *a: val_lbl.config(text=f"{int(round(var.get()))}" if isinstance(var, tk.IntVar) else f"{var.get():.1f}"))
+            
+            def update_label(*a):
+                val = var.get()
+                txt = f"{int(round(val))}" if isinstance(var, tk.IntVar) else f"{val:.1f}"
+                val_lbl.config(text=txt)
+            
+            var.trace_add("write", update_label)
+            update_label()
+            
             desc_lbl = ttk.Label(grid_frame, text=desc, style="Desc.TLabel")
             desc_lbl.grid(row=r*2+1, column=c+1, sticky="w", padx=5, pady=(0,0))
             self.widget_refs[tag] = [ttk.Label(grid_frame, text=label), sl, val_lbl, desc_lbl]
 
         add_radio(0, 0, "颜色模式", self.p_colormode, [("Color", "color"), ("BW", "bw")], "彩色或黑白图像", "colormode")
         add_radio(0, 3, "拟合模式", self.p_mode, [("Spline", "spline"), ("Polygon", "polygon"), ("Pixel", "pixel")], "曲线 / 多边形 / 像素", "mode")
-        add_slider(1, 0, "去噪强度", self.p_filter_speckle, 0, 16, "忽略小噪点斑块(0-16)", "filter_speckle")
-        add_slider(1, 3, "拐角阈值", self.p_corner_threshold, 0, 180, "拐角最小角度", "corner_threshold")
-        add_slider(2, 0, "色彩精度", self.p_color_precision, 1, 8, "色彩位深 (仅Color)", "color_precision")
-        add_slider(2, 3, "线段长度", self.p_segment_length, 3.5, 10, "细分线段长度(3.5-10)", "segment_length")
-        add_slider(3, 0, "梯度步长", self.p_gradient_step, 0, 64, "层级差异 (仅Color)", "gradient_step")
-        add_slider(3, 3, "拼接阈值", self.p_splice_threshold, 0, 180, "拼接角度阈值", "splice_threshold")
-        add_slider(4, 0, "路径精度", self.p_path_precision, 1, 10, "生成路径小数位", "path_precision")
-        add_radio(5, 0, "堆叠方式", self.p_hierarchical, [("Stacked", "stacked"), ("Cutout", "cutout")], "Stacked(推荐) 或 Cutout (仅Color)", "hierarchical")
+        add_slider(1, 0, "去噪强度", self.p_filter_speckle, 0, 16, "丢弃小于X像素的色块", "filter_speckle")
+        add_slider(1, 3, "拐角阈值", self.p_corner_threshold, 0, 180, "越高曲线越平滑", "corner_threshold")
+        add_slider(2, 0, "色彩精度", self.p_color_precision, 1, 8, "越高颜色还原越精准(数值8时渐变步长最小为1)", "color_precision")
+        add_slider(2, 3, "线段长度", self.p_segment_length, 3.5, 10, "越高结果越粗糙", "segment_length")
+        add_slider(3, 0, "渐变步长", self.p_gradient_step, 0, 255, "越小图层越多，渐变越细腻(数值0时色彩精度最大为7)", "gradient_step")
+        add_slider(3, 3, "拼接阈值", self.p_splice_threshold, 0, 180, "越低曲线拟合越精准", "splice_threshold")
+        add_slider(4, 0, "路径精度", self.p_path_precision, 0, 16, "越高路径坐标越精确", "path_precision")
+        add_radio(5, 0, "堆叠方式", self.p_hierarchical, [("Stacked", "stacked"), ("Cutout", "cutout")], "Stacked(推荐) 或 Cutout(形状互不重叠)", "hierarchical")
 
         # 4. 日志 & 按钮
         log_ctrl = ttk.Frame(main_pad); log_ctrl.pack(fill="x", pady=(15, 5))
@@ -317,11 +345,9 @@ class PicToSvgApp:
         self.log_text.pack(side="left", fill="both", expand=True); self.scrollbar.pack(side="right", fill="y")
 
         action_frame = ttk.Frame(main_pad); action_frame.pack(fill="x", pady=(5, 5))
-        # 缩小按钮高度 45 -> 38
-        self.btn_run = RoundedButton(action_frame, text="开始转换", command=self.start_processing_thread, width=200, height=38)
+        self.btn_run = RoundedButton(action_frame, text="开始批量转换", command=self.start_processing_thread, width=200, height=38)
         self.btn_run.pack(anchor="center")
         
-        # 缩小进度条 6 -> 4
         self.progress = RoundedProgressBar(main_pad, height=4, bg_color="#e9ecef", fill_color="#28a745")
         self.progress.pack(fill="x", pady=(5, 10))
         
@@ -376,26 +402,49 @@ class PicToSvgApp:
     def load_config(self):
         if os.path.exists(CONFIG_FILE):
             try:
-                with open(CONFIG_FILE, 'r') as f:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     self.input_dir.set(data.get("input", ""))
                     self.output_dir.set(data.get("output", ""))
                     self.process_subdirs.set(data.get("subdirs", False))
                     self.delete_original.set(data.get("delete", False))
-            except: pass
+                    if "colormode" in data: self.p_colormode.set(data["colormode"])
+                    if "hierarchical" in data: self.p_hierarchical.set(data["hierarchical"])
+                    if "mode" in data: self.p_mode.set(data["mode"])
+                    if "filter_speckle" in data: self.p_filter_speckle.set(data["filter_speckle"])
+                    if "color_precision" in data: self.p_color_precision.set(data["color_precision"])
+                    if "gradient_step" in data: self.p_gradient_step.set(data["gradient_step"])
+                    if "corner_threshold" in data: self.p_corner_threshold.set(data["corner_threshold"])
+                    if "segment_length" in data: self.p_segment_length.set(data["segment_length"])
+                    if "splice_threshold" in data: self.p_splice_threshold.set(data["splice_threshold"])
+                    if "path_precision" in data: self.p_path_precision.set(data["path_precision"])
+            except Exception as e: pass
 
     def save_config(self):
         try:
-            with open(CONFIG_FILE, 'w') as f:
-                json.dump({"input": self.input_dir.get(), "output": self.output_dir.get(), "subdirs": self.process_subdirs.get(), "delete": self.delete_original.get()}, f)
+            data = {
+                "input": self.input_dir.get(), "output": self.output_dir.get(),
+                "subdirs": self.process_subdirs.get(), "delete": self.delete_original.get(),
+                "colormode": self.p_colormode.get(), "hierarchical": self.p_hierarchical.get(),
+                "mode": self.p_mode.get(), "filter_speckle": self.p_filter_speckle.get(),
+                "color_precision": self.p_color_precision.get(), "gradient_step": self.p_gradient_step.get(),
+                "corner_threshold": self.p_corner_threshold.get(), "segment_length": self.p_segment_length.get(),
+                "splice_threshold": self.p_splice_threshold.get(), "path_precision": self.p_path_precision.get()
+            }
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
         except: pass
 
     def start_processing_thread(self):
         if self.is_processing: return
         in_d = self.input_dir.get()
         if not in_d or not os.path.exists(in_d): return messagebox.showerror("提示", "请选择输入文件夹")
-        exe_path = get_exe_path()
+        exe_path = resource_path(EXECUTABLE_NAME)
         if not os.path.exists(exe_path): return messagebox.showerror("错误", f"找不到 {EXECUTABLE_NAME}")
+        
+        if self.p_colormode.get() == "color":
+            if self.p_color_precision.get() >= 8 and self.p_gradient_step.get() == 0:
+                self.p_gradient_step.set(1)
         
         self.save_config()
         if not self.log_visible: self.toggle_log()
